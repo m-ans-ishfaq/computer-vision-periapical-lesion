@@ -72,26 +72,14 @@ def train_classification(train_records, val_records, output_dir=None, num_epochs
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2, pin_memory=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, num_workers=2, pin_memory=True)
 
-    from src.models import BACKBONES
-    _, head_attr, _ = BACKBONES[backbone]
-
     model = get_classifier(backbone=backbone)
     model = model.to(device)
 
-    backbone_params = []
-    head_params = []
-    for name, param in model.named_parameters():
-        if head_attr.replace(".0", "") in name:
-            head_params.append(param)
-        else:
-            backbone_params.append(param)
-            param.requires_grad = True
+    for param in model.parameters():
+        param.requires_grad = True
 
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
-    optimizer = torch.optim.Adam([
-        {'params': backbone_params, 'lr': 5e-5},
-        {'params': head_params, 'lr': 1e-3}
-    ], weight_decay=1e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=2e-4, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer, T_max=epochs
     )
