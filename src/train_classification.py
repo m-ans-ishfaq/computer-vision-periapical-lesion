@@ -45,7 +45,7 @@ class ToothDataset(Dataset):
 def _device():
     return 'cuda' if torch.cuda.is_available() else 'cpu'
 
-def train_classification(train_records, val_records, output_dir=None, num_epochs=None, batch_size=None, device=None):
+def train_classification(train_records, val_records, output_dir=None, num_epochs=None, batch_size=None, device=None, backbone="resnet50"):
     if output_dir is None:
         output_dir = os.path.join(OUTPUTS_DIR, "classification")
     os.makedirs(output_dir, exist_ok=True)
@@ -68,14 +68,17 @@ def train_classification(train_records, val_records, output_dir=None, num_epochs
     weight_tensor = torch.tensor(weights, dtype=torch.float).to(device)
     print(f"  Class weights: {dict(zip([3,4,5], [round(w,3) for w in weights]))}")
 
-    model = get_classifier()
+    from src.models import BACKBONES
+    _, head_attr, _ = BACKBONES[backbone]
+
+    model = get_classifier(backbone=backbone)
     model = model.to(device)
 
     # Freeze backbone for first 2 epochs (let head learn first)
     backbone_params = []
     head_params = []
     for name, param in model.named_parameters():
-        if 'classifier' in name:
+        if head_attr.replace(".0", "") in name:
             head_params.append(param)
         else:
             backbone_params.append(param)

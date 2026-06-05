@@ -2,16 +2,26 @@ import torch
 import torch.nn as nn
 from src.config import NUM_CLASSES, DEVICE
 
-def get_classifier(pretrained=True):
+BACKBONES = {
+    "mobilenet_v3_small": ("mobilenet_v3_small", "classifier.0", 0.2),
+    "resnet50": ("resnet50", "fc", 0.5),
+    "efficientnet_b3": ("efficientnet_b3", "classifier.1", 0.5),
+}
+
+def get_classifier(pretrained=True, backbone="mobilenet_v3_small"):
     import torchvision.models as models
-    model = models.mobilenet_v3_small(weights="IMAGENET1K_V1" if pretrained else None)
-    in_features = model.classifier[0].in_features
-    model.classifier = nn.Sequential(
-        nn.Linear(in_features, 256),
+    name, head_attr, dropout = BACKBONES[backbone]
+    weights = "IMAGENET1K_V1" if pretrained else None
+    model = getattr(models, name)(weights=weights)
+
+    head = getattr(model, head_attr)
+    in_features = head.in_features if hasattr(head, "in_features") else head[0].in_features
+    setattr(model, head_attr, nn.Sequential(
+        nn.Linear(in_features, 512),
         nn.ReLU(),
-        nn.Dropout(0.2),
-        nn.Linear(256, NUM_CLASSES),
-    )
+        nn.Dropout(dropout),
+        nn.Linear(512, NUM_CLASSES),
+    ))
     return model.to(DEVICE)
 
 class UNetMini(nn.Module):
