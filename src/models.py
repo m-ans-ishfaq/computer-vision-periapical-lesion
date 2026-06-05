@@ -3,9 +3,9 @@ import torch.nn as nn
 from src.config import NUM_CLASSES, DEVICE
 
 BACKBONES = {
-    "mobilenet_v3_small": ("mobilenet_v3_small", "classifier.0", 0.2),
+    "mobilenet_v3_small": ("mobilenet_v3_small", "classifier", 0.2),
     "resnet50": ("resnet50", "fc", 0.5),
-    "efficientnet_b3": ("efficientnet_b3", "classifier.1", 0.5),
+    "efficientnet_b3": ("efficientnet_b3", "classifier", 0.5),
 }
 
 def get_classifier(pretrained=True, backbone="mobilenet_v3_small"):
@@ -15,7 +15,13 @@ def get_classifier(pretrained=True, backbone="mobilenet_v3_small"):
     model = getattr(models, name)(weights=weights)
 
     head = getattr(model, head_attr)
-    in_features = head.in_features if hasattr(head, "in_features") else head[0].in_features
+    if isinstance(head, nn.Sequential):
+        for layer in reversed(head):
+            if isinstance(layer, nn.Linear):
+                in_features = layer.in_features
+                break
+    else:
+        in_features = head.in_features
     setattr(model, head_attr, nn.Sequential(
         nn.Linear(in_features, 512),
         nn.ReLU(),
