@@ -31,13 +31,14 @@ _val_tfm = lambda sz: T.Compose([
 class ToothDataset(Dataset):
     def __init__(self, records, augment=False, cache=False, imgsz=224):
         self.records = records
-        self.tfm = _train_tfm(imgsz) if augment else _val_tfm(imgsz)
+        self._tfm = _train_tfm(imgsz) if augment else _val_tfm(imgsz)
+        self.augment = augment
         self.cache = cache
         self._imgs = None
         if cache:
             self._imgs = []
             for rec in tqdm(records, desc="Caching images"):
-                img = Image.open(rec["image_path"]).convert("RGB")
+                img = np.array(Image.open(rec["image_path"]).convert("RGB").resize((imgsz, imgsz), Image.BILINEAR))
                 self._imgs.append(img)
 
     def __len__(self):
@@ -46,11 +47,11 @@ class ToothDataset(Dataset):
     def __getitem__(self, idx):
         rec = self.records[idx]
         if self.cache:
-            image = self._imgs[idx].copy()
+            image = Image.fromarray(self._imgs[idx].copy())
         else:
             image = Image.open(rec["image_path"]).convert("RGB")
         label = rec["label"] - 3
-        return self.tfm(image), label
+        return self._tfm(image), label
 
 def _device():
     return 'cuda' if torch.cuda.is_available() else 'cpu'
