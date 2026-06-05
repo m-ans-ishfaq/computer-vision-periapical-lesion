@@ -8,8 +8,10 @@ BACKBONES = {
     "efficientnet_b3": ("efficientnet_b3", "classifier", 0.5),
 }
 
-def get_classifier(pretrained=True, backbone="mobilenet_v3_small"):
+def get_classifier(pretrained=True, backbone="mobilenet_v3_small", num_classes=None):
     import torchvision.models as models
+    if num_classes is None:
+        num_classes = NUM_CLASSES
     name, head_attr, dropout = BACKBONES[backbone]
     weights = "IMAGENET1K_V1" if pretrained else None
     model = getattr(models, name)(weights=weights)
@@ -26,7 +28,7 @@ def get_classifier(pretrained=True, backbone="mobilenet_v3_small"):
         nn.Linear(in_features, 512),
         nn.ReLU(),
         nn.Dropout(dropout),
-        nn.Linear(512, NUM_CLASSES),
+        nn.Linear(512, num_classes),
     ))
     return model.to(DEVICE)
 
