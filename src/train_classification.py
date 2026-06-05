@@ -70,8 +70,21 @@ def train_classification(train_records, val_records, output_dir=None, num_epochs
 
     model = get_classifier()
     model = model.to(device)
-    criterion = nn.CrossEntropyLoss(weight=weight_tensor)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
+
+    # Freeze backbone for first 2 epochs (let head learn first)
+    backbone_params = []
+    head_params = []
+    for name, param in model.named_parameters():
+        if 'classifier' in name:
+            head_params.append(param)
+        else:
+            backbone_params.append(param)
+
+    criterion = nn.CrossEntropyLoss(weight=weight_tensor, label_smoothing=0.1)
+    optimizer = torch.optim.Adam([
+        {'params': backbone_params, 'lr': 1e-4},
+        {'params': head_params, 'lr': 1e-3}
+    ], weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode='min', factor=0.5, patience=3, min_lr=1e-6
     )
@@ -82,8 +95,19 @@ def train_classification(train_records, val_records, output_dir=None, num_epochs
     best_state = None
     patience = 7
     no_improve = 0
+    freeze_epochs = 2
 
     for epoch in range(epochs):
+        # Unfreeze backbone after freeze_epochs
+        if epoch == freeze_epochs:
+            for p in backbone_params:
+                p.requires_grad = True
+            print(f"  Unfreezing backbone at epoch {epoch+1}")
+
+        if epoch < freeze_epochs:
+            for p in backbone_params:
+                p.requires_grad = False
+
         model.train()
         train_loss = 0
         for images, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}"):
