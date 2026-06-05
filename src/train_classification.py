@@ -13,8 +13,8 @@ import torchvision.transforms as T
 from src.config import *
 from src.models import get_classifier
 
-_train_tfm = T.Compose([
-    T.Resize((IMG_SIZE_CLS, IMG_SIZE_CLS)),
+_train_tfm = lambda sz: T.Compose([
+    T.Resize((sz, sz)),
     T.RandomHorizontalFlip(),
     T.RandomRotation(10),
     T.ColorJitter(brightness=0.2),
@@ -22,16 +22,16 @@ _train_tfm = T.Compose([
     T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
 
-_val_tfm = T.Compose([
-    T.Resize((IMG_SIZE_CLS, IMG_SIZE_CLS)),
+_val_tfm = lambda sz: T.Compose([
+    T.Resize((sz, sz)),
     T.ToTensor(),
     T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
 
 class ToothDataset(Dataset):
-    def __init__(self, records, augment=False, cache=False):
+    def __init__(self, records, augment=False, cache=False, imgsz=224):
         self.records = records
-        self.tfm = _train_tfm if augment else _val_tfm
+        self.tfm = _train_tfm(imgsz) if augment else _val_tfm(imgsz)
         self.cache = cache
         self._imgs = None
         if cache:
@@ -55,7 +55,7 @@ class ToothDataset(Dataset):
 def _device():
     return 'cuda' if torch.cuda.is_available() else 'cpu'
 
-def train_classification(train_records, val_records, output_dir=None, num_epochs=None, batch_size=None, device=None, backbone="resnet50"):
+def train_classification(train_records, val_records, output_dir=None, num_epochs=None, batch_size=None, device=None, backbone="resnet50", imgsz=384):
     if output_dir is None:
         output_dir = os.path.join(OUTPUTS_DIR, "classification")
     os.makedirs(output_dir, exist_ok=True)
@@ -65,8 +65,8 @@ def train_classification(train_records, val_records, output_dir=None, num_epochs
     epochs = num_epochs or EPOCHS_CLS
 
     print("Caching datasets in RAM...")
-    train_dataset = ToothDataset(train_records, augment=True, cache=True)
-    val_dataset = ToothDataset(val_records, augment=False, cache=True)
+    train_dataset = ToothDataset(train_records, augment=True, cache=True, imgsz=imgsz)
+    val_dataset = ToothDataset(val_records, augment=False, cache=True, imgsz=imgsz)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2, pin_memory=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, num_workers=2, pin_memory=True)
@@ -187,10 +187,10 @@ def train_classification(train_records, val_records, output_dir=None, num_epochs
 
     return model, history
 
-def evaluate_classification(model, test_records, batch_size=None, device=None):
+def evaluate_classification(model, test_records, batch_size=None, device=None, imgsz=384):
     device = device or _device()
     batch_size = batch_size or BATCH_SIZE
-    dataset = ToothDataset(test_records, augment=False)
+    dataset = ToothDataset(test_records, augment=False, imgsz=imgsz)
     loader = DataLoader(dataset, batch_size=batch_size, num_workers=2, pin_memory=True)
 
     model.eval()
