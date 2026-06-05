@@ -56,7 +56,7 @@ class ToothDataset(Dataset):
 def _device():
     return 'cuda' if torch.cuda.is_available() else 'cpu'
 
-def train_classification(train_records, val_records, output_dir=None, num_epochs=None, batch_size=None, device=None, backbone="resnet50", imgsz=384):
+def train_classification(train_records, val_records, output_dir=None, num_epochs=None, batch_size=None, device=None, backbone="mobilenet_v3_small", imgsz=224):
     if output_dir is None:
         output_dir = os.path.join(OUTPUTS_DIR, "classification")
     os.makedirs(output_dir, exist_ok=True)
