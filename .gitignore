@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Virtual env
+venv/
+.venv/
+env/
+
+# Data (raw dataset on Drive, processed generated at runtime)
+data/
+
+# Outputs (models, logs, plots)
+outputs/
+
+# Cloud models (downloaded from Colab)
+models/*.pth
+models/*.pt
+
+# Notebook temp files
+*_executed.ipynb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Git
+*.zip
+*.bat

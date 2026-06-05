@@ -1,0 +1,31 @@
+# Core ML/DL
+torch
+torchvision
+
+# Computer Vision
+opencv-python
+Pillow
+
+# Data Processing
+numpy
+pandas
+
+# Visualization
+matplotlib
+
+# Machine Learning Metrics
+scikit-learn
+tqdm
+
+# Object Detection / Segmentation
+ultralytics
+
+# Jupyter for .ipynb notebook
+jupyter
+ipykernel
+
+# GUI
+streamlit
+
+# YAML
+pyyaml
