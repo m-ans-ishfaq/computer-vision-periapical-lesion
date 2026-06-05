@@ -24,8 +24,10 @@ def load_models():
     det_path = os.path.join(MODELS_DIR, "best.pt")
 
     if os.path.exists(cls_path):
-        model = get_classifier()
-        model.load_state_dict(torch.load(cls_path, map_location=DEVICE))
+        state_dict = torch.load(cls_path, map_location=DEVICE)
+        num_cls = state_dict["classifier.3.weight"].shape[0]
+        model = get_classifier(num_classes=num_cls)
+        model.load_state_dict(state_dict)
         model.eval()
         models["classifier"] = model
 
@@ -120,16 +122,23 @@ with tab2:
             output = models["classifier"](input_tensor)
             probs = torch.softmax(output, dim=1)[0]
 
-        cls_order = sorted(CLASS_NAMES.items())
+        num_cls = output.shape[1]
         st.subheader("Prediction Results")
-        for label_num, label_name in cls_order:
-            idx = label_num - 3
-            st.progress(float(probs[idx]), text=f"{label_name}: {probs[idx]:.3f}")
-
-        pred_class = torch.argmax(probs).item()
-        names = [name for _, name in cls_order]
-        st.success(f"**Predicted Class: {names[pred_class]}** "
-                   f"(Severity: {'Mild' if pred_class == 0 else 'Moderate' if pred_class == 1 else 'Severe'})")
+        if num_cls == 2:
+            cls_names = {0: "PAI 3 (Mild)", 1: "PAI 4/5 (Moderate/Severe)"}
+            for i in range(2):
+                st.progress(float(probs[i]), text=f"{cls_names[i]}: {probs[i]:.3f}")
+            pred_class = torch.argmax(probs).item()
+            st.success(f"**Predicted: {cls_names[pred_class]}**")
+        else:
+            cls_order = sorted(CLASS_NAMES.items())
+            for label_num, label_name in cls_order:
+                idx = label_num - 3
+                st.progress(float(probs[idx]), text=f"{label_name}: {probs[idx]:.3f}")
+            pred_class = torch.argmax(probs).item()
+            names = [name for _, name in cls_order]
+            st.success(f"**Predicted Class: {names[pred_class]}** "
+                       f"(Severity: {'Mild' if pred_class == 0 else 'Moderate' if pred_class == 1 else 'Severe'})")
 
 with tab3:
     st.header("Object Detection")
