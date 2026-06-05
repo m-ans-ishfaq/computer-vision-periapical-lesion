@@ -8,7 +8,7 @@ from src.config import *
 def _device():
     return 'cuda' if torch.cuda.is_available() else 'cpu'
 
-def train_detection(yaml_path, output_dir=None, epochs=None, batch_size=None, device=None):
+def train_detection(yaml_path, output_dir=None, epochs=None, batch_size=None, device=None, **kwargs):
     if output_dir is None:
         output_dir = os.path.join(OUTPUTS_DIR, "detection")
     os.makedirs(output_dir, exist_ok=True)
@@ -19,7 +19,7 @@ def train_detection(yaml_path, output_dir=None, epochs=None, batch_size=None, de
 
     model = YOLO("yolov8n.pt")
 
-    results = model.train(
+    train_kwargs = dict(
         data=yaml_path,
         epochs=epochs,
         imgsz=IMG_SIZE_DET,
@@ -31,6 +31,9 @@ def train_detection(yaml_path, output_dir=None, epochs=None, batch_size=None, de
         verbose=True,
         workers=2,
     )
+    train_kwargs.update(kwargs)
+
+    results = model.train(**train_kwargs)
 
     metrics = model.val(data=yaml_path, device=device)
 
