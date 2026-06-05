@@ -115,7 +115,12 @@ def train_segmentation(train_records, val_records, output_dir=None, num_epochs=N
         model = get_segmenter(img_size=img_size)
         model.load_state_dict(ckpt["model_state_dict"])
         model = model.to(device)
-        optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
+        enc_params = [p for n, p in model.named_parameters() if n.startswith("encoder")]
+        dec_params = [p for n, p in model.named_parameters() if not n.startswith("encoder")]
+        optimizer = torch.optim.AdamW([
+            {'params': enc_params, 'lr': 1e-4},
+            {'params': dec_params, 'lr': 1e-3},
+        ], weight_decay=1e-4)
         optimizer.load_state_dict(ckpt["optimizer_state_dict"])
         start_epoch = ckpt["epoch"]
         history = ckpt.get("history", {"train_loss": [], "val_loss": [], "val_dice": [], "val_iou": []})
@@ -124,7 +129,12 @@ def train_segmentation(train_records, val_records, output_dir=None, num_epochs=N
     else:
         model = get_segmenter(img_size=img_size)
         model = model.to(device)
-        optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
+        enc_params = [p for n, p in model.named_parameters() if n.startswith("encoder")]
+        dec_params = [p for n, p in model.named_parameters() if not n.startswith("encoder")]
+        optimizer = torch.optim.AdamW([
+            {'params': enc_params, 'lr': 1e-4},
+            {'params': dec_params, 'lr': 1e-3},
+        ], weight_decay=1e-4)
         start_epoch = 0
         history = {"train_loss": [], "val_loss": [], "val_dice": [], "val_iou": []}
         best_val_dice = 0.0
