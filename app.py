@@ -3,7 +3,6 @@ import sys
 import os
 import json
 import tempfile
-import time
 from PIL import Image
 import numpy as np
 import torch
@@ -12,21 +11,17 @@ import cv2
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from src.config import *
 from src.models import get_classifier, get_segmenter
+from src.data_utils import scan_dataset, parse_labelme_xml
 
 st.set_page_config(page_title="Periapical Lesion Analysis", layout="wide")
 st.title("Periapical Lesion Analysis System")
 st.markdown("Classification · Detection · Segmentation on Panoramic Dental X-rays")
 
-def load_models(use_cloud):
+def load_models():
     models = {}
-    if use_cloud:
-        cls_path = os.path.join(MODELS_DIR, "classifier.pth")
-        seg_path = os.path.join(MODELS_DIR, "segmenter.pth")
-        det_path = os.path.join(MODELS_DIR, "best.pt")
-    else:
-        cls_path = os.path.join(OUTPUTS_DIR, "classification", "classifier.pth")
-        seg_path = os.path.join(OUTPUTS_DIR, "segmentation", "segmenter.pth")
-        det_path = os.path.join(OUTPUTS_DIR, "detection", "yolo_run", "weights", "best.pt")
+    cls_path = os.path.join(MODELS_DIR, "classifier.pth")
+    seg_path = os.path.join(MODELS_DIR, "segmenter.pth")
+    det_path = os.path.join(MODELS_DIR, "best.pt")
 
     if os.path.exists(cls_path):
         model = get_classifier()
@@ -46,9 +41,12 @@ def load_models(use_cloud):
 
     return models
 
-use_cloud = st.sidebar.checkbox("Use cloud models", False,
-                                help="Load models from models/ folder instead of outputs/")
-models = load_models(use_cloud)
+if "models" not in st.session_state:
+    st.session_state.models = load_models()
+models = st.session_state.models
+
+show_solution = st.sidebar.checkbox("Show solution", False,
+                                    help="Show ground truth annotations alongside predictions")
 
 tab1, tab2, tab3, tab4 = st.tabs(["Dashboard", "Classification", "Detection", "Segmentation"])
 
@@ -56,17 +54,9 @@ with tab1:
     st.header("Model Performance Dashboard")
     col1, col2, col3 = st.columns(3)
 
-    if use_cloud:
-        cls_metrics_path = os.path.join(MODELS_DIR, "classification_metrics.json")
-        det_metrics_path = os.path.join(MODELS_DIR, "detection_metrics.json")
-        seg_metrics_path = os.path.join(MODELS_DIR, "segmentation_metrics.json")
-    else:
-        cls_metrics_path = os.path.join(OUTPUTS_DIR, "classification", "metrics.json")
-        det_metrics_path = os.path.join(OUTPUTS_DIR, "detection", "metrics.json")
-        seg_metrics_path = os.path.join(OUTPUTS_DIR, "segmentation", "metrics.json")
-
     with col1:
         st.subheader("Classification")
+        cls_metrics_path = os.path.join(MODELS_DIR, "classification_metrics.json")
         if os.path.exists(cls_metrics_path):
             with open(cls_metrics_path) as f:
                 m = json.load(f)
@@ -74,10 +64,11 @@ with tab1:
             st.metric("F1-Score", f"{m['f1_score']:.3f}")
             st.metric("Precision", f"{m['precision']:.3f}")
         else:
-            st.info("Run 02_classification.ipynb first")
+            st.info("No classification model found")
 
     with col2:
         st.subheader("Detection")
+        det_metrics_path = os.path.join(MODELS_DIR, "detection_metrics.json")
         if os.path.exists(det_metrics_path):
             with open(det_metrics_path) as f:
                 m = json.load(f)
@@ -85,17 +76,18 @@ with tab1:
             st.metric("mAP@50:95", f"{m['mAP50_95']:.3f}")
             st.metric("Precision", f"{m['precision']:.3f}")
         else:
-            st.info("Run 03_detection.ipynb first")
+            st.info("No detection model found")
 
     with col3:
         st.subheader("Segmentation")
+        seg_metrics_path = os.path.join(MODELS_DIR, "segmentation_metrics.json")
         if os.path.exists(seg_metrics_path):
             with open(seg_metrics_path) as f:
                 m = json.load(f)
             st.metric("Dice", f"{m['dice']:.3f}")
             st.metric("IoU", f"{m['iou']:.3f}")
         else:
-            st.info("Run 04_segmentation.ipynb first")
+            st.info("No segmentation model found")
 
     st.subheader("Training Curves")
     curves = {
@@ -152,10 +144,40 @@ with tab3:
 
         results = models["detector"](temp_path, device=DEVICE, conf=0.25)
         img_with_boxes = results[0].plot()
-        st.image(img_with_boxes, caption="Detection Results", channels="BGR", width=700)
 
         cls_order = sorted(CLASS_NAMES.items())
         names = [name for _, name in cls_order]
+
+        if show_solution:
+            _, _, annot_dir = scan_dataset()
+            gt_img = cv2.imread(temp_path)
+            found = False
+            if annot_dir:
+                xml_name = os.path.splitext(uploaded.name)[0] + ".xml"
+                xml_path = os.path.join(annot_dir, xml_name)
+                if os.path.exists(xml_path):
+                    annot = parse_labelme_xml(xml_path)
+                    if annot and annot.get("objects"):
+                        found = True
+                        for obj in annot["objects"]:
+                            xmin, ymin, xmax, ymax = obj["bbox"]
+                            label = obj["label"]
+                            label_name = CLASS_NAMES.get(label, f"PAI {label}")
+                            cv2.rectangle(gt_img, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
+                            cv2.putText(gt_img, label_name, (xmin, max(ymin - 5, 15)),
+                                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.image(img_with_boxes, caption="Detection Predictions", channels="BGR", width=700)
+            with col2:
+                if found:
+                    st.image(gt_img, caption="Ground Truth Solution", channels="BGR", width=700)
+                else:
+                    st.info("No ground truth annotation available for this image")
+        else:
+            st.image(img_with_boxes, caption="Detection Results", channels="BGR", width=700)
+
         st.subheader("Detected Lesions")
         for i, box in enumerate(results[0].boxes):
             cls = int(box.cls[0])
@@ -219,15 +241,13 @@ with tab4:
                 st.info(f"Predicted {class_labels.get(u, f'Class {u}')}: {c / total_pixels * 100:.1f}% of image")
 
 st.sidebar.header("About")
-model_source = "models/ (cloud)" if use_cloud else "outputs/ (local)"
 st.sidebar.info(
     "**Dataset:** Periapical Lesions in Panoramic Radiographs\n"
     "**Classes:** PAI 3, PAI 4, PAI 5\n"
-    "**Tasks:** Classification, Detection, Segmentation\n"
-    f"**Model source:** {model_source}\n\n"
-    "Place cloud-trained models in the models/ folder."
+    "**Tasks:** Classification, Detection, Segmentation\n\n"
+    "Trained models loaded from the models/ folder."
 )
 st.sidebar.header("Quick Actions")
 if st.sidebar.button("Reload Models"):
-    st.cache_resource.clear()
+    st.session_state.models = load_models()
     st.rerun()
