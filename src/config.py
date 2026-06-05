@@ -1,9 +1,14 @@
 import os
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_RAW = os.path.join(BASE_DIR, "data", "raw")
-DATA_PROCESSED = os.path.join(BASE_DIR, "data", "processed")
-DATA_ANNOTATIONS = os.path.join(BASE_DIR, "data", "annotations")
+# If code/ exists as a subdir, data/ is one level up
+if os.path.basename(BASE_DIR) == "code":
+    _PARENT = os.path.dirname(BASE_DIR)
+else:
+    _PARENT = BASE_DIR
+DATA_RAW = os.path.join(_PARENT, "data", "raw")
+DATA_PROCESSED = os.path.join(_PARENT, "data", "processed")
+DATA_ANNOTATIONS = os.path.join(_PARENT, "data", "annotations")
 MODELS_DIR = os.path.join(BASE_DIR, "models")
 OUTPUTS_DIR = os.path.join(BASE_DIR, "outputs")
 NOTEBOOKS_DIR = os.path.join(BASE_DIR, "notebooks")
