@@ -29,16 +29,26 @@ _val_tfm = T.Compose([
 ])
 
 class ToothDataset(Dataset):
-    def __init__(self, records, augment=False):
+    def __init__(self, records, augment=False, cache=False):
         self.records = records
         self.tfm = _train_tfm if augment else _val_tfm
+        self.cache = cache
+        self._imgs = None
+        if cache:
+            self._imgs = []
+            for rec in tqdm(records, desc="Caching images"):
+                img = Image.open(rec["image_path"]).convert("RGB")
+                self._imgs.append(img)
 
     def __len__(self):
         return len(self.records)
 
     def __getitem__(self, idx):
         rec = self.records[idx]
-        image = Image.open(rec["image_path"]).convert("RGB")
+        if self.cache:
+            image = self._imgs[idx].copy()
+        else:
+            image = Image.open(rec["image_path"]).convert("RGB")
         label = rec["label"] - 3
         return self.tfm(image), label
 
@@ -54,8 +64,9 @@ def train_classification(train_records, val_records, output_dir=None, num_epochs
     batch_size = batch_size or BATCH_SIZE
     epochs = num_epochs or EPOCHS_CLS
 
-    train_dataset = ToothDataset(train_records, augment=True)
-    val_dataset = ToothDataset(val_records, augment=False)
+    print("Caching datasets in RAM...")
+    train_dataset = ToothDataset(train_records, augment=True, cache=True)
+    val_dataset = ToothDataset(val_records, augment=False, cache=True)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2, pin_memory=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, num_workers=2, pin_memory=True)
