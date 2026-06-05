@@ -72,14 +72,6 @@ def train_classification(train_records, val_records, output_dir=None, num_epochs
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2, pin_memory=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, num_workers=2, pin_memory=True)
 
-    labels = [r["label"] - 3 for r in train_records]
-    counts = Counter(labels)
-    weights = [1.0 / counts.get(i, 1) for i in range(NUM_CLASSES)]
-    total = sum(weights)
-    weights = [w / total * NUM_CLASSES for w in weights]
-    weight_tensor = torch.tensor(weights, dtype=torch.float).to(device)
-    print(f"  Class weights: {dict(zip([3,4,5], [round(w,3) for w in weights]))}")
-
     from src.models import BACKBONES
     _, head_attr, _ = BACKBONES[backbone]
 
@@ -95,7 +87,7 @@ def train_classification(train_records, val_records, output_dir=None, num_epochs
         else:
             backbone_params.append(param)
 
-    criterion = nn.CrossEntropyLoss(weight=weight_tensor, label_smoothing=0.1)
+    criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
     optimizer = torch.optim.Adam([
         {'params': backbone_params, 'lr': 1e-4},
         {'params': head_params, 'lr': 1e-3}

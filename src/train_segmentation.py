@@ -90,27 +90,6 @@ def train_segmentation(train_records, val_records, output_dir=None, num_epochs=N
 
     criterion = nn.CrossEntropyLoss()
 
-    checkpoint_path = os.path.join(output_dir, "checkpoint.pth")
-    history_path = os.path.join(output_dir, "history.json")
-
-    start_epoch = 0
-    history = {"train_loss": [], "val_loss": [], "val_dice": [], "val_iou": []}
-
-    if resume_from is not None:
-        ckpt = torch.load(resume_from, map_location=DEVICE)
-        model = get_segmenter()
-        model.load_state_dict(ckpt["model_state_dict"])
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-        optimizer.load_state_dict(ckpt["optimizer_state_dict"])
-        start_epoch = ckpt["epoch"]
-        history = ckpt.get("history", history)
-        print(f"  Resumed from epoch {start_epoch}")
-    else:
-        model = get_segmenter()
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-
-    criterion = nn.CrossEntropyLoss()
-
     for epoch in range(start_epoch, epochs):
         model.train()
         train_loss = 0
