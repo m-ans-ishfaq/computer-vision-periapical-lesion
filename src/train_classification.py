@@ -87,7 +87,7 @@ def train_classification(train_records, val_records, output_dir=None, num_epochs
     criterion = nn.CrossEntropyLoss(weight=weight_tensor)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.5, patience=3, min_lr=1e-6, verbose=True
+        optimizer, mode='min', factor=0.5, patience=3, min_lr=1e-6
     )
 
     history = {"train_loss": [], "val_loss": [], "val_acc": [], "lr": []}
