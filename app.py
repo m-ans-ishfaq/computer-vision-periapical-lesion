@@ -17,7 +17,6 @@ st.set_page_config(page_title="Periapical Lesion Analysis", layout="wide")
 st.title("Periapical Lesion Analysis System")
 st.markdown("Classification · Detection · Segmentation on Panoramic Dental X-rays")
 
-@st.cache_resource
 def load_models(use_cloud):
     models = {}
     if use_cloud:
@@ -57,9 +56,14 @@ with tab1:
     st.header("Model Performance Dashboard")
     col1, col2, col3 = st.columns(3)
 
-    cls_metrics_path = os.path.join(OUTPUTS_DIR, "classification", "metrics.json")
-    det_metrics_path = os.path.join(OUTPUTS_DIR, "detection", "metrics.json")
-    seg_metrics_path = os.path.join(OUTPUTS_DIR, "segmentation", "metrics.json")
+    if use_cloud:
+        cls_metrics_path = os.path.join(MODELS_DIR, "classification_metrics.json")
+        det_metrics_path = os.path.join(MODELS_DIR, "detection_metrics.json")
+        seg_metrics_path = os.path.join(MODELS_DIR, "segmentation_metrics.json")
+    else:
+        cls_metrics_path = os.path.join(OUTPUTS_DIR, "classification", "metrics.json")
+        det_metrics_path = os.path.join(OUTPUTS_DIR, "detection", "metrics.json")
+        seg_metrics_path = os.path.join(OUTPUTS_DIR, "segmentation", "metrics.json")
 
     with col1:
         st.subheader("Classification")
