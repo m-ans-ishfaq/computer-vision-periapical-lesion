@@ -92,7 +92,7 @@ class ComboLoss(nn.Module):
         dice_loss = 1 - dice.mean()
         return self.ce_weight * ce_loss + self.dice_weight * dice_loss
 
-def train_segmentation(train_records, val_records, output_dir=None, num_epochs=None, batch_size=None, device=None, resume_from=None, img_size=384):
+def train_segmentation(train_records, val_records, output_dir=None, num_epochs=None, batch_size=None, device=None, resume_from=None, img_size=384, backbone="resnet34"):
     if output_dir is None:
         output_dir = os.path.join(OUTPUTS_DIR, "segmentation")
     os.makedirs(output_dir, exist_ok=True)
@@ -112,7 +112,7 @@ def train_segmentation(train_records, val_records, output_dir=None, num_epochs=N
 
     if resume_from is not None:
         ckpt = torch.load(resume_from, map_location=device)
-        model = get_segmenter(img_size=img_size)
+        model = get_segmenter(backbone=backbone, img_size=img_size)
         model.load_state_dict(ckpt["model_state_dict"])
         model = model.to(device)
         enc_params = [p for n, p in model.named_parameters() if n.startswith("encoder")]
@@ -127,7 +127,7 @@ def train_segmentation(train_records, val_records, output_dir=None, num_epochs=N
         best_val_dice = ckpt.get("best_val_dice", 0.0)
         print(f"  Resumed from epoch {start_epoch}")
     else:
-        model = get_segmenter(img_size=img_size)
+        model = get_segmenter(backbone=backbone, img_size=img_size)
         model = model.to(device)
         enc_params = [p for n, p in model.named_parameters() if n.startswith("encoder")]
         dec_params = [p for n, p in model.named_parameters() if not n.startswith("encoder")]
