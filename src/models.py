@@ -64,5 +64,17 @@ class UNetMini(nn.Module):
         d3 = self.dec3(torch.cat([self.up3(d2), e1], dim=1))
         return self.out(d3)
 
-def get_segmenter():
-    return UNetMini(in_channels=3, out_channels=NUM_CLASSES + 1).to(DEVICE)
+def get_segmenter(backbone="resnet34", img_size=384):
+    try:
+        import segmentation_models_pytorch as smp
+        model = smp.Unet(
+            encoder_name=backbone,
+            encoder_weights="imagenet",
+            in_channels=3,
+            classes=NUM_CLASSES + 1,
+            activation=None,
+        )
+    except ImportError:
+        print("  segmentation_models_pytorch not found, falling back to UNetMini")
+        model = UNetMini(in_channels=3, out_channels=NUM_CLASSES + 1)
+    return model.to(DEVICE)
