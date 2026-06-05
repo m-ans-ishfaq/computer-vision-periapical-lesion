@@ -16,7 +16,7 @@ def get_classifier(pretrained=True, backbone="mobilenet_v3_small"):
 
     head = getattr(model, head_attr)
     if isinstance(head, nn.Sequential):
-        for layer in reversed(head):
+        for layer in head:
             if isinstance(layer, nn.Linear):
                 in_features = layer.in_features
                 break
