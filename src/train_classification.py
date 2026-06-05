@@ -78,7 +78,6 @@ def train_classification(train_records, val_records, output_dir=None, num_epochs
     model = get_classifier(backbone=backbone)
     model = model.to(device)
 
-    # Freeze backbone for first 2 epochs (let head learn first)
     backbone_params = []
     head_params = []
     for name, param in model.named_parameters():
@@ -86,14 +85,15 @@ def train_classification(train_records, val_records, output_dir=None, num_epochs
             head_params.append(param)
         else:
             backbone_params.append(param)
+            param.requires_grad = True
 
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
     optimizer = torch.optim.Adam([
-        {'params': backbone_params, 'lr': 1e-4},
+        {'params': backbone_params, 'lr': 5e-5},
         {'params': head_params, 'lr': 1e-3}
     ], weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.5, patience=3, min_lr=1e-6
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=epochs
     )
 
     history = {"train_loss": [], "val_loss": [], "val_acc": [], "lr": []}
@@ -102,19 +102,8 @@ def train_classification(train_records, val_records, output_dir=None, num_epochs
     best_state = None
     patience = 7
     no_improve = 0
-    freeze_epochs = 2
 
     for epoch in range(epochs):
-        # Unfreeze backbone after freeze_epochs
-        if epoch == freeze_epochs:
-            for p in backbone_params:
-                p.requires_grad = True
-            print(f"  Unfreezing backbone at epoch {epoch+1}")
-
-        if epoch < freeze_epochs:
-            for p in backbone_params:
-                p.requires_grad = False
-
         model.train()
         train_loss = 0
         for images, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}"):
@@ -150,7 +139,7 @@ def train_classification(train_records, val_records, output_dir=None, num_epochs
         history["val_acc"].append(val_acc)
         history["lr"].append(current_lr)
 
-        scheduler.step(avg_val_loss)
+        scheduler.step()
 
         print(f"Epoch {epoch+1}: Train Loss={avg_train_loss:.4f}, "
               f"Val Loss={avg_val_loss:.4f}, Val Acc={val_acc:.4f}, LR={current_lr:.6f}")
