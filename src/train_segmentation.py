@@ -118,7 +118,7 @@ def train_segmentation(train_records, val_records, output_dir=None, num_epochs=N
         enc_params = [p for n, p in model.named_parameters() if n.startswith("encoder")]
         dec_params = [p for n, p in model.named_parameters() if not n.startswith("encoder")]
         optimizer = torch.optim.AdamW([
-            {'params': enc_params, 'lr': 1e-4},
+            {'params': enc_params, 'lr': 5e-4},
             {'params': dec_params, 'lr': 1e-3},
         ], weight_decay=1e-4)
         optimizer.load_state_dict(ckpt["optimizer_state_dict"])
@@ -132,7 +132,7 @@ def train_segmentation(train_records, val_records, output_dir=None, num_epochs=N
         enc_params = [p for n, p in model.named_parameters() if n.startswith("encoder")]
         dec_params = [p for n, p in model.named_parameters() if not n.startswith("encoder")]
         optimizer = torch.optim.AdamW([
-            {'params': enc_params, 'lr': 1e-4},
+            {'params': enc_params, 'lr': 5e-4},
             {'params': dec_params, 'lr': 1e-3},
         ], weight_decay=1e-4)
         start_epoch = 0

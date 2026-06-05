@@ -76,6 +76,7 @@ def get_segmenter(backbone="resnet34", img_size=384):
         model = smp.Unet(
             encoder_name=backbone,
             encoder_weights="imagenet",
+            encoder_depth=4,
             in_channels=3,
             classes=NUM_CLASSES + 1,
             activation=None,
