@@ -34,28 +34,36 @@ class ToothDataset(Dataset):
         image = self.transform(image)
         return image, label
 
-def train_classification(train_records, val_records, output_dir=None):
+def _device():
+    return 'cuda' if torch.cuda.is_available() else 'cpu'
+
+def train_classification(train_records, val_records, output_dir=None, num_epochs=None, batch_size=None, device=None):
     if output_dir is None:
         output_dir = os.path.join(OUTPUTS_DIR, "classification")
     os.makedirs(output_dir, exist_ok=True)
 
+    device = device or _device()
+    batch_size = batch_size or BATCH_SIZE
+    epochs = num_epochs or EPOCHS_CLS
+
     train_dataset = ToothDataset(train_records)
     val_dataset = ToothDataset(val_records)
 
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size)
 
     model = get_classifier()
+    model = model.to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
     history = {"train_loss": [], "val_loss": [], "val_acc": []}
 
-    for epoch in range(EPOCHS_CLS):
+    for epoch in range(epochs):
         model.train()
         train_loss = 0
-        for images, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/{EPOCHS_CLS}"):
-            images, labels = images.to(DEVICE), labels.to(DEVICE)
+        for images, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}"):
+            images, labels = images.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = model(images)
             loss = criterion(outputs, labels)
@@ -68,7 +76,7 @@ def train_classification(train_records, val_records, output_dir=None):
         all_preds, all_labels = [], []
         with torch.no_grad():
             for images, labels in val_loader:
-                images, labels = images.to(DEVICE), labels.to(DEVICE)
+                images, labels = images.to(device), labels.to(device)
                 outputs = model(images)
                 loss = criterion(outputs, labels)
                 val_loss += loss.item()
@@ -91,16 +99,18 @@ def train_classification(train_records, val_records, output_dir=None):
 
     return model, history
 
-def evaluate_classification(model, test_records):
+def evaluate_classification(model, test_records, batch_size=None, device=None):
+    device = device or _device()
+    batch_size = batch_size or BATCH_SIZE
     dataset = ToothDataset(test_records)
-    loader = DataLoader(dataset, batch_size=BATCH_SIZE)
+    loader = DataLoader(dataset, batch_size=batch_size)
 
     model.eval()
     all_preds, all_labels, all_probs = [], [], []
 
     with torch.no_grad():
         for images, labels in loader:
-            images = images.to(DEVICE)
+            images = images.to(device)
             outputs = model(images)
             probs = torch.softmax(outputs, dim=1)
             _, preds = torch.max(outputs, 1)

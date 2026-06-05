@@ -10,6 +10,9 @@ from tqdm import tqdm
 from src.config import *
 from src.models import get_segmenter
 
+def _device():
+    return 'cuda' if torch.cuda.is_available() else 'cpu'
+
 class SegDataset(Dataset):
     def __init__(self, records, img_size=IMG_SIZE_SEG):
         self.records = records
@@ -49,16 +52,43 @@ def compute_iou(pred, target, num_classes, smooth=1e-6):
     iou = (intersection + smooth) / (union + smooth)
     return iou.mean().item()
 
-def train_segmentation(train_records, val_records, output_dir=None, num_epochs=None, resume_from=None):
+def train_segmentation(train_records, val_records, output_dir=None, num_epochs=None, batch_size=None, device=None, resume_from=None):
     if output_dir is None:
         output_dir = os.path.join(OUTPUTS_DIR, "segmentation")
     os.makedirs(output_dir, exist_ok=True)
 
+    device = device or _device()
+    batch_size = batch_size or BATCH_SIZE
+    epochs = num_epochs or EPOCHS_SEG
+
     train_dataset = SegDataset(train_records)
     val_dataset = SegDataset(val_records)
 
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size)
+
+    checkpoint_path = os.path.join(output_dir, "checkpoint.pth")
+    history_path = os.path.join(output_dir, "history.json")
+
+    start_epoch = 0
+    history = {"train_loss": [], "val_loss": [], "val_dice": [], "val_iou": []}
+
+    if resume_from is not None:
+        ckpt = torch.load(resume_from, map_location=device)
+        model = get_segmenter()
+        model.load_state_dict(ckpt["model_state_dict"])
+        model = model.to(device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+        optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+        start_epoch = ckpt["epoch"]
+        history = ckpt.get("history", history)
+        print(f"  Resumed from epoch {start_epoch}")
+    else:
+        model = get_segmenter()
+        model = model.to(device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+    criterion = nn.CrossEntropyLoss()
 
     checkpoint_path = os.path.join(output_dir, "checkpoint.pth")
     history_path = os.path.join(output_dir, "history.json")
@@ -80,13 +110,12 @@ def train_segmentation(train_records, val_records, output_dir=None, num_epochs=N
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
     criterion = nn.CrossEntropyLoss()
-    epochs = num_epochs if num_epochs is not None else EPOCHS_SEG
 
     for epoch in range(start_epoch, epochs):
         model.train()
         train_loss = 0
         for images, masks in tqdm(train_loader, desc=f"Seg Epoch {epoch+1}/{epochs}"):
-            images, masks = images.to(DEVICE), masks.to(DEVICE)
+            images, masks = images.to(device), masks.to(device)
             optimizer.zero_grad()
             outputs = model(images)
             loss = criterion(outputs, masks)
@@ -99,7 +128,7 @@ def train_segmentation(train_records, val_records, output_dir=None, num_epochs=N
         all_preds, all_masks = [], []
         with torch.no_grad():
             for images, masks in val_loader:
-                images, masks = images.to(DEVICE), masks.to(DEVICE)
+                images, masks = images.to(device), masks.to(device)
                 outputs = model(images)
                 loss = criterion(outputs, masks)
                 val_loss += loss.item()
@@ -138,16 +167,18 @@ def train_segmentation(train_records, val_records, output_dir=None, num_epochs=N
 
     return model, history
 
-def evaluate_segmentation(model, test_records):
+def evaluate_segmentation(model, test_records, batch_size=None, device=None):
+    device = device or _device()
+    batch_size = batch_size or BATCH_SIZE
     dataset = SegDataset(test_records)
-    loader = DataLoader(dataset, batch_size=BATCH_SIZE)
+    loader = DataLoader(dataset, batch_size=batch_size)
 
     model.eval()
     all_preds, all_masks = [], []
 
     with torch.no_grad():
         for images, masks in loader:
-            images = images.to(DEVICE)
+            images = images.to(device)
             outputs = model(images)
             preds = torch.argmax(outputs, dim=1)
             all_preds.append(preds.cpu())

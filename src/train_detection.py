@@ -1,30 +1,38 @@
 import os
+import torch
 from ultralytics import YOLO
 import json
 
 from src.config import *
 
-def train_detection(yaml_path, output_dir=None):
+def _device():
+    return 'cuda' if torch.cuda.is_available() else 'cpu'
+
+def train_detection(yaml_path, output_dir=None, epochs=None, batch_size=None, device=None):
     if output_dir is None:
         output_dir = os.path.join(OUTPUTS_DIR, "detection")
     os.makedirs(output_dir, exist_ok=True)
+
+    device = device or _device()
+    batch_size = batch_size or BATCH_SIZE
+    epochs = epochs or EPOCHS_DET
 
     model = YOLO("yolov8n.pt")
 
     results = model.train(
         data=yaml_path,
-        epochs=EPOCHS_DET,
+        epochs=epochs,
         imgsz=IMG_SIZE_DET,
-        batch=BATCH_SIZE,
-        device=DEVICE,
+        batch=batch_size,
+        device=device,
         project=output_dir,
         name="yolo_run",
         exist_ok=True,
         verbose=True,
-        workers=0,
+        workers=2,
     )
 
-    metrics = model.val(data=yaml_path, device=DEVICE)
+    metrics = model.val(data=yaml_path, device=device)
 
     results_summary = {
         "mAP50": float(metrics.box.map50),
